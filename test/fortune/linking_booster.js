@@ -7,6 +7,79 @@ var request = require("supertest");
 var Promise = RSVP.Promise;
 
 module.exports = function(options){
+
+  describe.skip('linking profiling', function(){
+    var ids, baseUrl;
+    beforeEach(function(done){
+      ids = options.ids;
+      baseUrl = options.baseUrl;
+
+      function create(resource, doc){
+        return new RSVP.Promise(function(resolve){
+          var body = {};
+          body[resource] = [doc];
+          request(baseUrl).post('/' + resource)
+            .set('content-type', 'application/json').send(JSON.stringify(body))
+            .end(function(err){
+              should.not.exist(err);
+              resolve();
+            });
+        });
+      }
+
+      function generatePeople(){
+        var tasks = [];
+        for (var i = 0; i < 50; i++){
+          tasks.push(create('people', {email: i}));
+        }
+        return tasks;
+      }
+
+      function generateTasks(person, start){
+        var tasks = [];
+        for (var i = start; i < start +30; i++){
+          tasks.push(create('addresses', {person: person, name: i + ''}));
+          tasks.push(create('houses', {landlord: person, address: i + ''}));
+          tasks.push(create('cars', {owner: person, licenseNumber: i + ''}));
+        }
+        return tasks;
+      }
+
+      RSVP.all(generatePeople())
+        .then(function(){
+          return RSVP.all(generateTasks(ids.people[0], 0))
+        })
+        .then(function(){
+          return RSVP.all(generateTasks(ids.people[0], 31));
+        })
+        .then(function(){
+          return RSVP.all(generateTasks(ids.people[0], 61));
+        })
+        .then(function(){
+          var people = [];
+          for (var i = 1; i < 50; i++){
+            people.push(generateTasks(i), 65 * i);
+          }
+          return RSVP.all(people);
+        }).then(function(){
+          done();
+        });
+    });
+
+    it('should not suck', function(done){
+      var t = process.hrtime();
+      var include = '?include=addresses,estate,cars';
+      request(baseUrl).get('/people/' + ids.people[0] + include)
+        .expect(200)
+        .end(function(err){
+          should.not.exist(err);
+          console.log('done: ', process.hrtime(t));
+          done();
+        })
+    });
+
+  });
+
   describe("linking booster", function(){
     var mockResources, booster, director;
 
