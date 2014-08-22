@@ -530,6 +530,75 @@ module.exports = function(options){
             })
         });
       });
+      describe('update operations filter', function(){
+        it('should be able to apply provided filter to PATCH requests', function(done){
+          request(baseUrl).patch('/people/' + ids.people[0] + '?filter[name]=nobody')
+            .set('content-type', 'application/json')
+            .send(JSON.stringify([
+              {op: 'replace', path: '/people/0/email', value: 'hacked'}
+            ]))
+            .expect(403)
+            .end(function(err, res){
+              should.not.exist(err);
+              var body = JSON.parse(res.text);
+              should.not.exist(body.people);
+              done();
+            });
+        });
+        it('should be able to apply provided filter to DELETE requests', function(done){
+          request(baseUrl).del('/people?filter[email]=' + ids.people[0])
+            .end(function(err){
+              should.not.exist(err);
+              request(baseUrl).get('/people')
+                .end(function(err, res){
+                  var body = JSON.parse(res.text);
+                  body.people.length.should.not.equal(0);
+                  done();
+                });
+            });
+        });
+        it('should be able to apply provided filter to individual DELETE request', function(done){
+          request(baseUrl).del('/people/' + ids.people[0] + '?filter[email]=' + ids.people[1])
+            .end(function(err){
+              should.not.exist(err);
+              request(baseUrl).get('/people/' + ids.people[0])
+                .end(function(err, res){
+                  should.not.exist(err);
+                  var body = JSON.parse(res.text);
+                  should.exist(body.people[0]);
+                  body.people[0].email.should.equal(ids.people[0]);
+                  done();
+                });
+            });
+        });
+        it('should work fine with complex filters for PATCH', function(done){
+          request(baseUrl).patch('/people/' + ids.people[1] + '?filter[and][0][or][0][email][regex]=' + ids.people[1])
+            .set('content-type', 'application/json')
+            .send(JSON.stringify([
+              {op: 'replace', path: '/people/0/name', value: 'hacked'}
+            ]))
+            .expect(200)
+            .end(function(err, res){
+              should.not.exist(err);
+              var body = JSON.parse(res.text);
+              body.people[0].name.should.equal('hacked');
+              done();
+            });
+        });
+        it('should work fine with complex filters for DELETE', function(done){
+          request(baseUrl).del('/people?filter[and][0][or][0][email][regex]=' + ids.people[1])
+            .expect(204)
+            .end(function(err, res){
+              should.not.exist(err);
+              request(baseUrl).get('/people/' + ids.people[1])
+                .expect(404)
+                .end(function(err, res){
+                  should.not.exist(err);
+                  done();
+                });
+            });
+        });
+      });
     });
 
     describe('limits', function(){
