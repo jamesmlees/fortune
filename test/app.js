@@ -80,7 +80,7 @@ module.exports = function(options, port) {
       password: String,
       appearances: Number,
       birthday: Date,
-      email: {type: String},
+      email: {type: String, access: {write: ["admin"]}},
       pets: ['pet'],
       soulmate: {ref: 'person', inverse: 'soulmate', type: String},
       lovers: [{ref: 'person', inverse: 'lovers', type: String}],

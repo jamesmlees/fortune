@@ -78,7 +78,7 @@ module.exports = function(options){
         });
     });
   });
-  describe.skip("native mongoose middleware", function(){
+  describe("native mongoose middleware", function(){
     it("should be able to expose mongoose api to resources", function(done){
       new RSVP.Promise(function(resolve){
         request(baseUrl).post("/houses")
