@@ -60,6 +60,52 @@ module.exports = function(options){
       });
     });
 
+    describe('getting a subresource', function(){
+      beforeEach(function(done){
+        request(baseUrl).patch('/people/' + ids.people[0])
+          .set('content-type', 'application/json')
+          .send(JSON.stringify([
+            {op: 'replace', path: '/people/0/links/addresses', value: [ids.addresses[0], ids.addresses[1]]}
+          ]))
+          .expect(200)
+          .end(function(err, res){
+            should.not.exist(err);
+            var body = JSON.parse(res.text);
+            body.people[0].links.addresses.length.should.equal(2);
+            done();
+          });
+      });
+      it('should be able to return subresource', function(done){
+        request(baseUrl).get('/people/' + ids.people[0] + '/addresses')
+          .expect(200)
+          .end(function(err, res){
+            should.not.exist(err);
+            var body = JSON.parse(res.text);
+            body.addresses.length.should.equal(2);
+            should.not.exist(body.people);
+            done();
+          });
+      });
+      it('should apply provided filters to subresource only', function(done){
+        request(baseUrl).get('/addresses/' + ids.addresses[0])
+          .expect(200)
+          .end(function(err, res){
+            should.not.exist(err);
+            var addressName = JSON.parse(res.text).addresses[0].name;
+            request(baseUrl).get('/people/' + ids.people[0] + '/addresses?filter[name]=' + addressName)
+              .expect(200)
+              .end(function(err, res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.addresses.length.should.equal(1);
+                should.not.exist(body.people);
+                done();
+              });
+          })
+      });
+    });
+
+
     describe('creating a list of resources', function(){
       it('should create a list of resources setting proper references', function(done){
         var resources = _.reduce([ids.people[0], ids.people[0], ids.people[1]], function(memo, person){
@@ -203,7 +249,7 @@ module.exports = function(options){
       beforeEach(function(done){
         var cmd = [{
           op: 'add',
-          path: '/people/0/houses/-',
+          path: '/people/0/links/houses/-',
           value: ids.houses[0]
         }];
         patch('/people/' + ids.people[0], cmd, done);
@@ -211,7 +257,7 @@ module.exports = function(options){
       it('should atomically add item to array', function(done){
         var cmd = [{
           op: 'add',
-          path: '/people/0/houses/-',
+          path: '/people/0/links/houses/-',
           value: ids.houses[1]
         }];
         patch('/people/' + ids.people[0], cmd, function(err, res){
@@ -235,17 +281,41 @@ module.exports = function(options){
       it('should support bulk update', function(done){
         var cmd = [{
           op: 'add',
-          path: '/people/0/houses/-',
+          path: '/people/0/links/houses/-',
           value: ids.houses[0]
         },{
           op: 'add',
-          path: '/people/0/houses/-',
+          path: '/people/0/links/houses/-',
           value: ids.houses[0]
         }];
         patch('/people/' + ids.people[0], cmd, function(err, res){
           should.not.exist(err);
           var body = JSON.parse(res.text);
           (body.people[0].links.houses.length).should.equal(3);
+          done();
+        });
+      });
+      it('should be backward compatible with /resource/0/field syntax', function(done){
+        var cmd = [
+          {op: 'add', path: '/people/0/houses', value: ids.houses[1]},
+        ];
+        patch('/people/' + ids.people[0], cmd, function(err, res){
+          should.not.exist(err);
+          var body = JSON.parse(res.text);
+          body.people[0].links.houses.length.should.equal(2);
+          body.people[0].links.houses[1].should.equal(ids.houses[1]);
+          done();
+        });
+      });
+      it('should be backward compatible with /resource/0/field/- syntax', function(done){
+        var cmd = [
+          {op: 'add', path: '/people/0/houses/-', value: ids.houses[1]}
+        ];
+        patch('/people/' + ids.people[0], cmd, function(err, res){
+          should.not.exist(err);
+          var body = JSON.parse(res.text);
+          body.people[0].links.houses.length.should.equal(2);
+          body.people[0].links.houses[1].should.equal(ids.houses[1]);
           done();
         });
       });
@@ -270,15 +340,15 @@ module.exports = function(options){
       beforeEach(function(done){
         var cmd = [{
           op: 'add',
-          path: '/people/0/houses/-',
+          path: '/people/0/links/houses/-',
           value: ids.houses[0]
         },{
           op: 'add',
-          path: '/people/0/houses/-',
+          path: '/people/0/links/houses/-',
           value: ids.houses[1]
         },{
           op: 'add',
-          path: '/people/0/houses/-',
+          path: '/people/0/links/houses/-',
           value: ids.houses[2]
         }];
         patch('/people/' + ids.people[0], cmd, function(err){
@@ -292,11 +362,11 @@ module.exports = function(options){
       beforeEach(function(done){
         var cmd = [{
           op: 'add',
-          path: '/houses/0/owners/-',
+          path: '/houses/0/links/owners/-',
           value: ids.people[1]
         },{
           op: 'add',
-          path: '/houses/0/owners/-',
+          path: '/houses/0/links/owners/-',
           value: ids.people[2]
         }];
         patch('/houses/' + ids.houses[0], cmd, function(err){
@@ -307,7 +377,7 @@ module.exports = function(options){
       it('should atomically remove array item', function(done){
         var cmd = [{
           op: 'remove',
-          path: '/people/0/houses/' + ids.houses[0]
+          path: '/people/0/links/houses/' + ids.houses[0]
         }];
         patch('/people/' + ids.people[0], cmd, function(err, res){
           should.not.exist(err);
@@ -321,7 +391,7 @@ module.exports = function(options){
       it('should also update referenced item', function(done){
         var cmd = [{
           op: 'remove',
-          path: '/people/0/houses/' + ids.houses[0]
+          path: '/people/0/links/houses/' + ids.houses[0]
         }];
         patch('/people/' + ids.people[0], cmd, function(err){
           should.not.exist(err);
@@ -338,15 +408,26 @@ module.exports = function(options){
       it('should support bulk operation', function(done){
         var cmd = [{
           op: 'remove',
-          path: '/people/0/houses/' + ids.houses[0]
+          path: '/people/0/links/houses/' + ids.houses[0]
         },{
           op: 'remove',
-          path: '/people/0/houses/' + ids.houses[1]
+          path: '/people/0/links/houses/' + ids.houses[1]
         }];
         patch('/people/' + ids.people[0], cmd, function(err, res){
           should.not.exist(err);
           var body = JSON.parse(res.text);
           (body.people[0].links.houses.length).should.equal(1);
+          done();
+        });
+      });
+      it('should be backward compatible with /field/value syntax', function(done){
+        var cmd = [
+          {op: 'remove', path: '/people/0/houses/' + ids.houses[0]}
+        ];
+        patch('/people/' + ids.people[0], cmd, function(err,res){
+          should.not.exist(err);
+          var body = JSON.parse(res.text);
+          body.people[0].links.houses.length.should.equal(2);
           done();
         });
       });
