@@ -1,6 +1,6 @@
 var should = require('should');
 
-var adapter = require('../../lib/adapters/couchdb');
+var Adapter = require('../../lib/adapters/couchdb');
 
 var RSVP = require('rsvp');
 var Promise = RSVP.Promise;
@@ -13,12 +13,13 @@ RSVP.on('error', function (err) {
 
 //module.exports = function (options) {
 
-    describe('MongoDB adapter', function () {
+    describe('CouchDB adapter', function () {
         var ids;
 
         describe('Creation', function () {
             it('should be able to create document with provided id', function (done) {
               
+                var adapter = Adapter({ host: process.env.WERCKER_COUCHDB_HOST || 'localhost', port: process.env.WERCKER_COUCHDB_PORT ||5984})
                 var doc = {
                     id: '123456789012345678901234'
                 };
