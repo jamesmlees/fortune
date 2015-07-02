@@ -362,5 +362,521 @@ module.exports = function(options){
           });
       });
     });
+    describe('linking ', function(){
+      describe('one to one relationship', function(){
+        beforeEach(function(done){
+          request(baseUrl).patch('/people/' + ids.people[0])
+            .set('content-type', 'application/json')
+            .send(JSON.stringify([
+              {op: 'replace', path: '/people/0/links/soulmate', value: ids.people[1]}
+            ]))
+            .expect(200)
+            .end(function(err){
+              should.not.exist(err);
+              done();
+            });
+        });
+        it('should link up not-deleted resources', function(done){
+          request(baseUrl).get('/people?include=soulmate&includeDeleted=true&filter[id]=' + ids.people[0])
+            .expect(200)
+            .end(function(err,res){
+              should.not.exist(err);
+              var body = JSON.parse(res.text);
+              body.linked.people.should.be.an.Array;
+              body.linked.people.length.should.equal(1);
+              body.linked.people[0].id.should.equal(ids.people[1]);
+              done();
+            });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is child', function(done){
+           request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+             request(baseUrl).get('/people?include=soulmate&includeDeleted=true&filter[id]=' + ids.people[0])
+               .expect(200)
+               .end(function(err,res){
+                 should.not.exist(err);
+                 var body = JSON.parse(res.text);
+                 body.linked.people.should.be.an.Array;
+                 body.linked.people.length.should.equal(1);
+                 body.linked.people[0].id.should.equal(ids.people[1]);
+                 done();
+               });
+           });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=soulmate&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[1]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+            request(baseUrl).get('/people?include=soulmate&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=soulmate')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people?include=soulmate&includeDeleted=true&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[1]);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=soulmate&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[1]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people?include=soulmate&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=soulmate')
+              .expect(404)
+              .end(function(err,res){
+                should.not.exist(err);
+                //edge case - expected to yield 404
+                done();
+              });
+          });
+        });
+      });
+      describe('one to many relationship', function(){
+        beforeEach(function(done){
+          request(baseUrl).patch('/addresses/' + ids.addresses[0])
+            .set('content-type', 'application/json')
+            .send(JSON.stringify([
+              {op: 'replace', path: '/addresses/0/links/person', value: ids.people[0]}
+            ]))
+            .end(function(){
+              done();
+            });
+        });
+        it('should link up not-deleted resources', function(done){
+          request(baseUrl).get('/addresses/' + ids.addresses[0] + '?include=person')
+            .end(function(err, res){
+              var body = JSON.parse(res.text);
+              body.linked.people.should.be.an.Array;
+              body.linked.people.length.should.equal(1);
+              body.linked.people[0].id.should.equal(ids.people[0]);
+              done();
+            });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/addresses?include=person&includeDeleted=true&filter[id]=' + ids.addresses[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[0]);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/addresses/' + ids.addresses[0] + '?include=person&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[0]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/addresses?include=person&filter[id]=' + ids.addresses[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/addresses/' + ids.addresses[0] + '?include=person')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/addresses?include=person&includeDeleted=true&filter[id]=' + ids.addresses[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[0]);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/addresses/' + ids.addresses[0] + '?include=person&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[0]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/addresses?include=person&filter[id]=' + ids.addresses[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/addresses/' + ids.addresses[0] + '?include=person')
+              .expect(404)
+              .end(function(err,res){
+                should.not.exist(err);
+                //edge case - expected to yield 404
+                done();
+              });
+          });
+        });
+      });
+      describe('many to one relationship', function(){
+        beforeEach(function(done){
+          request(baseUrl).patch('/people/' + ids.people[0])
+            .set('content-type', 'application/json')
+            .send(JSON.stringify([
+              {op: 'replace', path: '/people/0/links/addresses', value: [ids.addresses[0]]}
+            ]))
+            .end(function(){
+              done();
+            });
+        });
+        it('should link up not-deleted resources', function(done){
+          request(baseUrl).get('/people/' + ids.people[0] + '?include=addresses')
+            .end(function(err, res){
+              var body = JSON.parse(res.text);
+              body.linked.addresses.should.be.an.Array;
+              body.linked.addresses.length.should.equal(1);
+              body.linked.addresses[0].id.should.equal(ids.addresses[0]);
+              done();
+            });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is child', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/people?include=addresses&includeDeleted=true&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.addresses.should.be.an.Array;
+                body.linked.addresses.length.should.equal(1);
+                body.linked.addresses[0].id.should.equal(ids.addresses[0]);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=addresses&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.addresses.should.be.an.Array;
+                body.linked.addresses.length.should.equal(1);
+                body.linked.addresses[0].id.should.equal(ids.addresses[0]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is child', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/people?include=addresses&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.addresses.should.be.an.Array;
+                body.linked.addresses.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/addresses/' + ids.addresses[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=addresses')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.addresses.should.be.an.Array;
+                body.linked.addresses.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people?include=addresses&includeDeleted=true&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.addresses.should.be.an.Array;
+                body.linked.addresses.length.should.equal(1);
+                body.linked.addresses[0].id.should.equal(ids.addresses[0]);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=addresses&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.addresses.should.be.an.Array;
+                body.linked.addresses.length.should.equal(1);
+                body.linked.addresses[0].id.should.equal(ids.addresses[0]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people?include=addresses&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.addresses.should.be.an.Array;
+                body.linked.addresses.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=addresses')
+              .expect(404)
+              .end(function(err,res){
+                should.not.exist(err);
+                //edge case - expected to yield 404
+                done();
+              });
+          });
+        });
+      });
+      describe('many to many relationship', function(){
+        beforeEach(function(done){
+          request(baseUrl).patch('/people/' + ids.people[0])
+            .set('content-type', 'application/json')
+            .send(JSON.stringify([
+              {op: 'replace', path: '/people/0/links/lovers', value: ids.people[1]}
+            ]))
+            .end(done)
+        });
+        it('should link up not-deleted resources', function(done){
+          request(baseUrl).get('/people/' + ids.people[0] + '?include=lovers')
+            .end(function(err, res){
+              var body = JSON.parse(res.text);
+              body.linked.people.should.be.an.Array;
+              body.linked.people.length.should.equal(1);
+              body.linked.people[0].id.should.equal(ids.people[1]);
+              done();
+            });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+            request(baseUrl).get('/people?include=lovers&includeDeleted=true&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[1]);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=lovers&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[1]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+            request(baseUrl).get('/people?include=lovers&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is child', function(done){
+          request(baseUrl).del('/people/' + ids.people[1]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=lovers')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people?include=lovers&includeDeleted=true&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[1]);
+                done();
+              });
+          });
+        });
+        it('should link up deleted resource when includeDeleted is requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=lovers&includeDeleted=true')
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(1);
+                body.linked.people[0].id.should.equal(ids.people[1]);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for collection route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people?include=lovers&filter[id]=' + ids.people[0])
+              .expect(200)
+              .end(function(err,res){
+                should.not.exist(err);
+                var body = JSON.parse(res.text);
+                body.linked.people.should.be.an.Array;
+                body.linked.people.length.should.equal(0);
+                done();
+              });
+          });
+        });
+        it('should not link up deleted resource when includeDeleted is not requested for individual route - deleted is parent', function(done){
+          request(baseUrl).del('/people/' + ids.people[0]).end(function(){
+            request(baseUrl).get('/people/' + ids.people[0] + '?include=lovers')
+              .expect(404)
+              .end(function(err,res){
+                should.not.exist(err);
+                //edge case - expected to yield 404
+                done();
+              });
+          });
+        });
+      });
+    });
   });
 };
